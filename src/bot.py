@@ -1,24 +1,31 @@
+import functools
 import os
 import logging
-import asyncio
 import signal
-import threading
 from dotenv import load_dotenv
 from telegram.ext import Application, CommandHandler
 
-from database import get_db, close_db
-from handlers import start, help_command, subscribe, unsubscribe, list_subscriptions
-from alert_monitor import start_monitoring
+from database import add_admin, close_db
+from handlers import (
+    get_subscriptions,
+    get_users,
+    start,
+    help_command,
+    subscribe,
+    unsubscribe,
+    list_subscriptions,
+)
+from alert_monitor import check_alerts
+from config import ALERT_CHECK_INTERVAL, SUPERUSER_USER_ID, TELEGRAM_BOT_TOKEN
 
 # Load environment variables
 load_dotenv()
 
 # Configure logging
-logging.basicConfig(
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    level=logging.INFO
-)
+
+
 logger = logging.getLogger(__name__)
+
 
 def signal_handler(signum, frame):
     """Handle shutdown signals."""
@@ -26,33 +33,35 @@ def signal_handler(signum, frame):
     close_db()
     exit(0)
 
-def main():
+
+def setup():
     # Set up signal handlers
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
+    # Add superuser to admins
+    add_admin(SUPERUSER_USER_ID)
 
-    # Initialize database (this will create the connection and tables)
-    get_db("/Users/rhron255/Documents/Code/TelegramRedAlert/telegram-red-alert/db")
 
+def main():
     # Create the Application
-    application = Application.builder().token(os.getenv('TELEGRAM_BOT_TOKEN')).build()
+    application = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
 
     # Add handlers
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("help", help_command))
-    application.add_handler(CommandHandler("subscribe", subscribe))
-    application.add_handler(CommandHandler("unsubscribe", unsubscribe))
+    application.add_handler(CommandHandler("subscribe", subscribe, has_args=True))
+    application.add_handler(CommandHandler("unsubscribe", unsubscribe, has_args=True))
     application.add_handler(CommandHandler("list", list_subscriptions))
+    application.add_handler(CommandHandler("get_users", get_users))
+    application.add_handler(CommandHandler("get_subscriptions", get_subscriptions))
 
-    # Start alert monitoring in the background
-    threading.Thread(target=start_monitoring, args=(application.bot, 1),daemon=True).start()
+    application.job_queue.run_repeating(check_alerts, interval=ALERT_CHECK_INTERVAL)
 
-    try:
-        # Start the bot
-        application.run_polling()
-    finally:
-        # Ensure database connection is closed
-        close_db()
+    application.run_polling()
 
-if __name__ == '__main__':
-    asyncio.run(main()) 
+    close_db()
+
+
+if __name__ == "__main__":
+    setup()
+    main()
