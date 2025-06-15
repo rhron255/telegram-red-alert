@@ -30,10 +30,9 @@ async def check_alerts(bot: Bot, session: requests.Session) -> None:
             timeout=10
         )
         response.raise_for_status()
-        data = response.json()
+        data = {} if response.text.strip() == '' else response.json()
 
-        if not data or not isinstance(data, dict):
-            return
+        print(data)
 
         # Get all subscriptions
         subscriptions = get_all_subscriptions()
@@ -45,7 +44,7 @@ async def check_alerts(bot: Bot, session: requests.Session) -> None:
             
             # Notify subscribed users
             for user_id, locations in subscriptions.items():
-                if any(loc in alert_location for loc in locations):
+                if any(loc in alert_location for loc in locations) or 'all' in locations:
                     message = f"🚨 Red Alert in {alert_location}\nTime: {alert_time}"
                     try:
                         await bot.send_message(chat_id=user_id, text=message)

@@ -2,6 +2,7 @@ import os
 import logging
 import asyncio
 import signal
+import threading
 from dotenv import load_dotenv
 from telegram.ext import Application, CommandHandler
 
@@ -31,7 +32,7 @@ def main():
     signal.signal(signal.SIGTERM, signal_handler)
 
     # Initialize database (this will create the connection and tables)
-    get_db()
+    get_db("/Users/rhron255/Documents/Code/TelegramRedAlert/telegram-red-alert/db")
 
     # Create the Application
     application = Application.builder().token(os.getenv('TELEGRAM_BOT_TOKEN')).build()
@@ -44,7 +45,7 @@ def main():
     application.add_handler(CommandHandler("list", list_subscriptions))
 
     # Start alert monitoring in the background
-    asyncio.create_task(start_monitoring(application.bot))
+    threading.Thread(target=start_monitoring, args=(application.bot, 1),daemon=True).start()
 
     try:
         # Start the bot
@@ -54,4 +55,4 @@ def main():
         close_db()
 
 if __name__ == '__main__':
-    main() 
+    asyncio.run(main()) 
