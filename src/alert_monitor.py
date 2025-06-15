@@ -71,7 +71,7 @@ async def check_alerts(context: CallbackContext) -> None:
         for user_id, locations in subscriptions.items():
             user_locs = [loc for loc in locations if loc in alert_locations]
             if any(loc in alert_locations for loc in locations) or "all" in locations:
-                message = f"🚨 {title} 🚨" + "desc" + "\n".join(user_locs)
+                message = f"🚨 {title} 🚨" + "\n" + desc + "\n".join(user_locs)
                 try:
                     await bot.send_message(chat_id=user_id, text=message)
                 except Exception as e:
