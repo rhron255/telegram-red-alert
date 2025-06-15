@@ -1,18 +1,24 @@
 import os
+import logging
 import subprocess
 import time
+
+logger = logging.getLogger(__name__)
+logging.basicConfig(
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
+)
 
 DIDNT_REALLY_PULL_TEXT = "Already up to date."
 
 while True:
-    print("Attempting to pull")
+    logger.info("Attempting to pull")
     did_really_pull = subprocess.run(["git", "pull"], capture_output=True)
 
     if did_really_pull.returncode == 0:
         if DIDNT_REALLY_PULL_TEXT in did_really_pull.stdout.decode("utf-8"):
-            print("Empty pull")
+            logger.info("Empty pull")
         else:
-            print("Pulled successfully, re-running compose")
+            logger.info("Pulled successfully, re-running compose")
             try:
                 if os.name == "nt":
                     # check compose call type either docker-compose or docker compose
@@ -31,8 +37,8 @@ while True:
                         subprocess.run(["docker", "compose", "build"]).check_returncode()
                         subprocess.run(["docker", "compose", "up", "-d"]).check_returncode()
             except subprocess.CalledProcessError as e:
-                print(f"Error running compose: {e}")
+                logger.error(f"Error running compose: {e}")
     else:
-        print("Pull failed")
-    print("Sleeping for 10 seconds")
+        logger.error("Pull failed")
+    logger.info("Sleeping for 10 seconds")
     time.sleep(10)
