@@ -17,14 +17,18 @@ while True:
                 if os.name == "nt":
                     # check compose call type either docker-compose or docker compose
                     if "docker-compose" in subprocess.run(["where", "docker-compose"], capture_output=True).stdout.decode("utf-8"):
+                        subprocess.run(["docker-compose", "build"]).check_returncode()
                         subprocess.run(["docker-compose", "up", "-d"]).check_returncode()
                     else:
+                        subprocess.run(["docker", "compose", "build"]).check_returncode()
                         subprocess.run(["docker", "compose", "up", "-d"]).check_returncode()
                 else:
                     # for bash / zsh / fish / etc.
                     if "docker-compose" in subprocess.run(["which", "docker-compose"], capture_output=True).stdout.decode("utf-8"):
+                        subprocess.run(["docker-compose", "build"]).check_returncode()
                         subprocess.run(["docker-compose", "up", "-d"]).check_returncode()
                     else:
+                        subprocess.run(["docker", "compose", "build"]).check_returncode()
                         subprocess.run(["docker", "compose", "up", "-d"]).check_returncode()
             except subprocess.CalledProcessError as e:
                 print(f"Error running compose: {e}")
