@@ -69,10 +69,11 @@ async def subscribe(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         return
 
     user_id = update.effective_user.id
+    user_name = update.effective_user.username
     location = " ".join(context.args).lower()
 
     if add_subscription(user_id, location):
-        logger.info(f"User {user_id} subscribed to alerts for: {location}")
+        logger.info(f"User {user_name} subscribed to alerts for: {location}")
         await update.message.reply_text(f"Subscribed to alerts for: {location}")
     else:
         await update.message.reply_text("Failed to add subscription. Please try again.")
