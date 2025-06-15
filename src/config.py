@@ -20,4 +20,3 @@ SUPERUSER_USER_ID = int(os.getenv("SUPERUSER_ID"))
 ALERT_CHECK_INTERVAL = int(os.getenv("ALERT_CHECK_INTERVAL"))
 
 SQLITE_DB_PATH = os.getenv("SQLITE_DB_PATH")
-os.env

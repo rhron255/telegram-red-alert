@@ -11,6 +11,7 @@ from alert_response import EMPTY_RESPONSE_TEXT
 
 logger = logging.getLogger(__name__)
 
+alerts_handled = set()
 
 def create_session() -> requests.Session:
     """Create and configure a requests session."""
@@ -50,6 +51,11 @@ async def check_alerts(context: CallbackContext) -> None:
             decoded_data = response.text.encode("utf-8").decode("utf-8-sig")
 
             data = json.loads(decoded_data)
+        
+        if data["id"] in alerts_handled:
+            return
+        
+        alerts_handled.add(data["id"])
 
         logger.info(f"Alert in progress: {data['title']}")
         # Get all subscriptions
