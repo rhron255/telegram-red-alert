@@ -69,11 +69,10 @@ async def subscribe(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         return
 
     user_id = update.effective_user.id
-    user_name = update.effective_user.username
     location = " ".join(context.args).lower()
 
     if add_subscription(user_id, location):
-        logger.info(f"User {user_name} subscribed to alerts for: {location}")
+        logger.info(f"User {user_id} subscribed to alerts for: {location}")
         await update.message.reply_text(f"Subscribed to alerts for: {location}")
     else:
         await update.message.reply_text("Failed to add subscription. Please try again.")
@@ -117,7 +116,7 @@ async def list_subscriptions(
 @admin_command
 async def get_users(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Get all users"""
-    logger.info(f"User: {update.effective_user.username} requested all users")
+    logger.info(f"User: {update.effective_user.id} requested all users")
     users = get_all_users()
     await update.message.reply_text(f"All users:\n{users}")
 
@@ -125,7 +124,7 @@ async def get_users(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 @admin_command
 async def get_subscriptions(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Get all subscriptions"""
-    logger.info(f"User: {update.effective_user.username} requested all subscriptions")
+    logger.info(f"User: {update.effective_user.id} requested all subscriptions")
     subscriptions = "\n".join(
         f"{user_id}: {locations}"
         for user_id, locations in get_all_subscriptions().items()
