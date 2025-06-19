@@ -8,10 +8,11 @@ from telegram import Bot
 from telegram.ext import CallbackContext
 from database import get_all_subscriptions
 from alert_response import EMPTY_RESPONSE_TEXT
+from temporal_cache import TemporalCache
 
 logger = logging.getLogger(__name__)
 
-alerts_handled = set()
+alerts_handled = TemporalCache()
 
 
 def create_session() -> requests.Session:
@@ -26,6 +27,19 @@ def create_session() -> requests.Session:
         }
     )
     return session
+
+
+async def filter_alerts_to_publish(alert: dict) -> list[str]:
+    """Check if the alert should be published."""
+    if await alerts_handled.get(alert["id"]):
+        return []
+    if not await alerts_handled.get(alert["title"]):
+        return alert["data"]
+    return [
+        location
+        for location in alert["data"]
+        if location not in await alerts_handled.get(alert["title"])
+    ]
 
 
 async def check_alerts(context: CallbackContext) -> None:
@@ -53,36 +67,42 @@ async def check_alerts(context: CallbackContext) -> None:
 
             data = json.loads(decoded_data)
 
-        if data["id"] in alerts_handled:
-            return
-
-        alerts_handled.add(data["id"])
-
         logger.info(f"Alert in progress: {data['title']}")
-        # Get all subscriptions
-        subscriptions = get_all_subscriptions()
 
-        # Process alerts
-
-        title = data["title"]
-        desc = data["desc"]
-        alert_locations = data["data"]
-
-        # Notify subscribed users
-        for user_id, locations in subscriptions.items():
-            user_locs = [loc for loc in locations if loc in alert_locations]
-            if any(loc in alert_locations for loc in locations) or "all" in locations:
-                message = (
-                    f"🚨 {title} 🚨"
-                    + "\n"
-                    + desc
-                    + "\n\nמיקומים:\n"
-                    + "\n".join(user_locs)
-                )
-                try:
-                    await bot.send_message(chat_id=user_id, text=message)
-                except Exception as e:
-                    logger.error(f"Failed to send message to user {user_id}: {e}")
+        await publish_alert_to_users(data, bot)
 
     except Exception as e:
         logger.error(f"Error checking alerts: {e}")
+
+
+async def publish_alert_to_users(alert: dict, bot: Bot) -> None:
+    alert_locations = await filter_alerts_to_publish(alert)
+
+    if len(alert_locations) == 0:
+        logger.info(
+            f"No locations to publish for alert {alert['id']}, not yet expired..."
+        )
+        return
+
+    await alerts_handled.put(alert["id"], alert)
+    await alerts_handled.put(alert["title"], alert_locations)
+
+    # Get all subscriptions
+    subscriptions = get_all_subscriptions()
+
+    # Process alerts
+
+    title = alert["title"]
+    desc = alert["desc"]
+
+    # Notify subscribed users
+    for user_id, locations in subscriptions.items():
+        user_locs = [loc for loc in locations if loc in alert_locations]
+        if any(loc in alert_locations for loc in locations) or "all" in locations:
+            message = (
+                f"🚨 {title} 🚨" + "\n" + desc + "\n\nמיקומים:\n" + "\n".join(user_locs)
+            )
+            try:
+                await bot.send_message(chat_id=user_id, text=message)
+            except Exception as e:
+                logger.error(f"Failed to send message to user {user_id}: {e}")

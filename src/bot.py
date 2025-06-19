@@ -9,6 +9,7 @@ from database import add_admin, close_db
 from handlers import (
     get_subscriptions,
     get_users,
+    process_alert_conversation,
     start,
     help_command,
     subscribe,
@@ -16,7 +17,7 @@ from handlers import (
     list_subscriptions,
 )
 from alert_monitor import check_alerts
-from config import ALERT_CHECK_INTERVAL, SUPERUSER_USER_ID, TELEGRAM_BOT_TOKEN
+from config import ALERT_CHECK_INTERVAL, DEV_MODE, SUPERUSER_USER_ID, TELEGRAM_BOT_TOKEN
 
 # Load environment variables
 load_dotenv()
@@ -54,7 +55,8 @@ def main():
     application.add_handler(CommandHandler("list", list_subscriptions))
     application.add_handler(CommandHandler("get_users", get_users))
     application.add_handler(CommandHandler("get_subscriptions", get_subscriptions))
-
+    if DEV_MODE:
+        application.add_handler(process_alert_conversation())
     application.job_queue.run_repeating(check_alerts, interval=ALERT_CHECK_INTERVAL)
 
     application.run_polling()
