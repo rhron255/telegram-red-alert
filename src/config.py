@@ -11,6 +11,7 @@ logging.basicConfig(
 )
 logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("apscheduler").setLevel(logging.WARNING)
+logging.getLogger("temporal_cache").setLevel(logging.DEBUG)
 
 # Telegram Configuration
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
@@ -20,3 +21,5 @@ SUPERUSER_USER_ID = int(os.getenv("SUPERUSER_ID"))
 ALERT_CHECK_INTERVAL = int(os.getenv("ALERT_CHECK_INTERVAL"))
 
 SQLITE_DB_PATH = os.getenv("SQLITE_DB_PATH")
+
+DEV_MODE = False  # Need to make this a proper env variable

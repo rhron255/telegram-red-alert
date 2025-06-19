@@ -1,7 +1,10 @@
 import functools
+import io
+import json
 import logging
 from telegram import Update
 from telegram.ext import ContextTypes
+from alert_monitor import publish_alert_to_users
 from database import (
     add_subscription,
     get_admins,
@@ -9,6 +12,13 @@ from database import (
     get_all_users,
     remove_subscription,
     get_user_subscriptions,
+)
+from telegram.ext import (
+    ConversationHandler,
+    CommandHandler,
+    MessageHandler,
+    filters,
+    ContextTypes,
 )
 
 logger = logging.getLogger(__name__)
@@ -30,14 +40,7 @@ def admin_command(func):
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Send a message when the command /start is issued."""
-    user = update.effective_user
-    await update.message.reply_text(
-        f"Hi {user.first_name}! I am your Red Alert Monitor bot.\n\n"
-        "Use /subscribe <location> to subscribe to alerts for a specific location.\n"
-        "Use /unsubscribe <location> to unsubscribe from a location.\n"
-        "Use /list to see your current subscriptions.\n"
-        "Use /help to see this message again."
-    )
+    await help_command(update, context)
 
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -51,6 +54,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
             "/get_users - Get all users\n"
             "/get_subscriptions - Get all subscriptions\n"
             "/help - Show this help message\n"
+            "/test_alert - Test alert message, send a json file with the alert data\n"
         )
     else:
         await update.message.reply_text(
@@ -130,3 +134,49 @@ async def get_subscriptions(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         for user_id, locations in get_all_subscriptions().items()
     )
     await update.message.reply_text(f"All subscriptions:\n{subscriptions}")
+
+
+PROCESSING_ALERT = 1
+
+
+def process_alert_conversation():
+    return ConversationHandler(
+        entry_points=[CommandHandler("test_alert", start_alert_conversation)],
+        states={
+            PROCESSING_ALERT: [
+                MessageHandler(filters.Document.ALL, process_alert_message)
+            ],
+        },
+        fallbacks=[CommandHandler("cancel", cancel)],
+    )
+
+
+@admin_command
+async def start_alert_conversation(
+    update: Update, context: ContextTypes.DEFAULT_TYPE
+) -> int:
+    await update.message.reply_text(
+        "**IMPORTANT**\n\nThis will trigger alerts to all users. If you are not sure, please cancel."
+    )
+    return PROCESSING_ALERT
+
+
+@admin_command
+async def process_alert_message(
+    update: Update, context: ContextTypes.DEFAULT_TYPE
+) -> int:
+    file_content: bytearray = await (
+        await update.message.document.get_file()
+    ).download_as_bytearray()
+    data = json.loads(file_content.decode("utf-8-sig"))
+    await update.message.reply_text("Alert message received and decoded successfully.")
+    await publish_alert_to_users(data, context.bot)
+    return ConversationHandler.END
+
+
+@admin_command
+async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    await update.message.reply_text(
+        "Alert conversation cancelled.\n\nNo alert was triggered."
+    )
+    return ConversationHandler.END
