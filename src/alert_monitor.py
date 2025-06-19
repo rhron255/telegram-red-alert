@@ -13,6 +13,7 @@ logger = logging.getLogger(__name__)
 
 alerts_handled = set()
 
+
 def create_session() -> requests.Session:
     """Create and configure a requests session."""
     session = requests.Session()
@@ -51,10 +52,10 @@ async def check_alerts(context: CallbackContext) -> None:
             decoded_data = response.text.encode("utf-8").decode("utf-8-sig")
 
             data = json.loads(decoded_data)
-        
+
         if data["id"] in alerts_handled:
             return
-        
+
         alerts_handled.add(data["id"])
 
         logger.info(f"Alert in progress: {data['title']}")
@@ -71,7 +72,13 @@ async def check_alerts(context: CallbackContext) -> None:
         for user_id, locations in subscriptions.items():
             user_locs = [loc for loc in locations if loc in alert_locations]
             if any(loc in alert_locations for loc in locations) or "all" in locations:
-                message = f"🚨 {title} 🚨" + "\n" + desc + "\n\nמיקומים:\n" + "\n".join(user_locs)
+                message = (
+                    f"🚨 {title} 🚨"
+                    + "\n"
+                    + desc
+                    + "\n\nמיקומים:\n"
+                    + "\n".join(user_locs)
+                )
                 try:
                     await bot.send_message(chat_id=user_id, text=message)
                 except Exception as e:
