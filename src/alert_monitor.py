@@ -97,7 +97,7 @@ async def publish_alert_to_users(alert: dict, bot: Bot) -> None:
 
     # Notify subscribed users
     for user_id, locations in subscriptions.items():
-        user_locs = [loc for loc in locations if loc in alert_locations]
+        user_locs = [loc for loc in alert_locations if any(map(lambda x: x in loc, locations))]
         if any(loc in alert_locations for loc in locations) or "all" in locations:
             message = (
                 f"🚨 {title} 🚨" + "\n" + desc + "\n\nמיקומים:\n" + "\n".join(user_locs)
