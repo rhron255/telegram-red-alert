@@ -1,42 +1,19 @@
 import asyncio
+from datetime import datetime
 import logging
 from collections import defaultdict
 from typing import Any, Callable, Coroutine
 
 logger = logging.getLogger(__name__)
 
+class _CacheEntry:
+    def __init__(self, value: Any, expiry: float) -> None:
+        self.value = value
+        self.expiry = expiry
+        self.inserted_at = datetime.now()
 
-class _Timer:
-    def __init__(
-        self,
-        timeout: float,
-        callback: Coroutine[Any, Any, None],
-        args: tuple = None,
-        kwargs: dict = None,
-    ) -> None:
-        self._timeout = timeout
-        self._callback = callback
-        self._args = args
-        self._kwargs = kwargs
-        self._task = asyncio.create_task(self._job())
-
-    async def _job(self):
-        await asyncio.sleep(self._timeout)
-        logger.debug(
-            f"Timer expired, executing {self._callback.__name__} with args {self._args} and kwargs {self._kwargs}"
-        )
-        if self._args and self._kwargs:
-            await self._callback(*self._args, **self._kwargs)
-        elif self._args:
-            await self._callback(*self._args)
-        elif self._kwargs:
-            await self._callback(**self._kwargs)
-        else:
-            await self._callback()
-
-    async def cancel(self):
-        self._task.cancel()
-
+    def is_expired(self) -> bool:
+        return self.expiry + self.inserted_at.timestamp() < datetime.now().timestamp()
 
 class TemporalCache:
     """
@@ -44,45 +21,38 @@ class TemporalCache:
     """
 
     def __init__(self, default_timeout: float = 60) -> None:
-        self._lock = asyncio.Lock()
-        self._timers = {}
         self.default_timeout = default_timeout
         self._cache = defaultdict(lambda: None)
 
-    async def _pop(self, key: Any):
-        async with self._lock:
-            await self._timers.pop(key).cancel()
-            self._cache.pop(key)
+    def _pop(self, key: Any):
+        pass
 
-    async def put(self, key: Any, value: Any = None, duration: float = None) -> None:
-        async with self._lock:
-            if key in self._timers:
-                self._timers[key].cancel()
-            self._timers[key] = _Timer(
-                duration or self.default_timeout, self._pop, (key,)
-            )
-            self._cache[key] = value
+    def put(self, key: Any, value: Any = None, duration: float = None) -> None:
+        self._cache[key] = _CacheEntry(value, duration or self.default_timeout)
 
-    async def put_dict(self, items: dict[Any, Any], duration: float = None) -> None:
-        async with self._lock:
-            for key, value in items.items():
-                await self.put(key, value, duration)
+    def get(self, key: Any) -> Any:
+        if key in self._cache:
+            entry = self._cache[key]
+            if entry and not entry.is_expired():
+                return entry.value
+            else:
+                self._pop(key)
+                return None
+        return None
 
-    async def put_all(self, items: list[Any], duration: float = None) -> None:
-        await self.put_dict(dict.fromkeys(items, None), duration)
+    def __contains__(self, key: Any) -> bool:
+        return key in self._cache and not self._cache[key].is_expired()
 
-    async def get(self, key: Any) -> Any:
-        async with self._lock:
-            return self._cache.get(key)
+    def __delitem__(self, key: Any) -> None:
+        if key in self._cache:
+            del self._cache[key]
 
-    async def __contains__(self, key: Any) -> bool:
-        async with self._lock:
-            return key in self._cache
+    def __setitem__(self, key: Any, value: Any) -> None:
+        self.put(key, value)
+    
+    def __getitem__(self, key: Any) -> Any:
+        return self.get(key)
 
-    async def __delitem__(self, key: Any) -> None:
-        async with self._lock:
-            self._cache.pop(key)
+    def items(self):
+        return {k: v.value for k, v in self._cache.items() if not v.is_expired()}
 
-    async def items(self):
-        async with self._lock:
-            return self._cache.items()
