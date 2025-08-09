@@ -23,3 +23,5 @@ ALERT_CHECK_INTERVAL = int(os.getenv("ALERT_CHECK_INTERVAL"))
 SQLITE_DB_PATH = os.getenv("SQLITE_DB_PATH")
 
 DEV_MODE = False  # Need to make this a proper env variable
+
+DEBUG_FOLDER = os.getenv("DEBUG_FOLDER")

@@ -1,9 +1,11 @@
 import asyncio
+from datetime import datetime
 import json
 import logging
 import time
 from typing import Dict, Set
 import requests
+from config import DEBUG_FOLDER
 from telegram import Bot
 from telegram.ext import CallbackContext
 from database import get_all_subscriptions
@@ -45,7 +47,6 @@ async def filter_alerts_to_publish(alert: dict) -> list[str]:
 async def check_alerts(context: CallbackContext) -> None:
     """Check for new alerts and notify subscribed users."""
     try:
-        bot = context.bot
         session = create_session()
 
         # First visit homepage to get cookies
@@ -63,16 +64,22 @@ async def check_alerts(context: CallbackContext) -> None:
         try:
             data = response.json()
         except Exception as e:
+            if response.text.strip() == "":
+                logger.warning("Received non standard empty response from alerts endpoint.")
+                return
+            
             decoded_data = response.text.encode("utf-8").decode("utf-8-sig")
 
             data = json.loads(decoded_data)
 
         logger.info(f"Alert in progress: {data['title']}")
 
-        await publish_alert_to_users(data, bot)
+        await publish_alert_to_users(data, context.bot)
 
     except Exception as e:
-        logger.error(f"Error checking alerts: {e}")
+        logger.exception(f"Error checking alerts: {type(e).__name__}: {e}\n{e.__traceback__}")
+        with open(f"{DEBUG_FOLDER}/error_log_{datetime.now().strftime('%d_%m_%y_%H:%M:%S')}.txt", "a") as f:
+            f.write(f"{type(e).__name__}: {e}\n{e.__traceback__}\n\ncontent: {response.text}\n\n")
 
 
 async def publish_alert_to_users(alert: dict, bot: Bot) -> None:
