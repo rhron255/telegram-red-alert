@@ -25,3 +25,5 @@ SQLITE_DB_PATH = os.getenv("SQLITE_DB_PATH")
 DEV_MODE = False  # Need to make this a proper env variable
 
 DEBUG_FOLDER = os.getenv("DEBUG_FOLDER")
+
+CACHE_TIMEOUT = int(os.getenv("CACHE_TIMEOUT", 120))

@@ -4,6 +4,8 @@ import logging
 from collections import defaultdict
 from typing import Any, Callable, Coroutine
 
+from config import CACHE_TIMEOUT
+
 logger = logging.getLogger(__name__)
 
 class _CacheEntry:
@@ -20,7 +22,7 @@ class TemporalCache:
     A cache which allows to set an expiry duration for entries in it
     """
 
-    def __init__(self, default_timeout: float = 60) -> None:
+    def __init__(self, default_timeout: float = CACHE_TIMEOUT) -> None:
         self.default_timeout = default_timeout
         self._cache = defaultdict(lambda: None)
 
