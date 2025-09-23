@@ -180,3 +180,29 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         "Alert conversation cancelled.\n\nNo alert was triggered."
     )
     return ConversationHandler.END
+
+@admin_command
+async def send_message_to_all(
+    update: Update, context: ContextTypes.DEFAULT_TYPE
+) -> None:
+    """Send a message to all users"""
+    if not context.args:
+        await update.message.reply_text("Please provide a message to send.")
+        return
+
+    message = " ".join(context.args)
+    users = get_all_users()
+    success_count = 0
+    failure_count = 0
+
+    for user_id in users:
+        try:
+            await context.bot.send_message(chat_id=user_id, text=message)
+            success_count += 1
+        except Exception as e:
+            logger.error(f"Failed to send message to {user_id}: {e}")
+            failure_count += 1
+
+    await update.message.reply_text(
+        f"Message sent to {success_count} users, failed to send to {failure_count} users."
+    )

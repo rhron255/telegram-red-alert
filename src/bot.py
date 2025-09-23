@@ -10,6 +10,7 @@ from handlers import (
     get_subscriptions,
     get_users,
     process_alert_conversation,
+    send_message_to_all,
     start,
     help_command,
     subscribe,
@@ -55,6 +56,7 @@ def main():
     application.add_handler(CommandHandler("list", list_subscriptions))
     application.add_handler(CommandHandler("get_users", get_users))
     application.add_handler(CommandHandler("get_subscriptions", get_subscriptions))
+    application.add_handler(CommandHandler("publish_message", send_message_to_all, has_args=True))
     if DEV_MODE:
         application.add_handler(process_alert_conversation())
     application.job_queue.run_repeating(check_alerts, interval=ALERT_CHECK_INTERVAL)

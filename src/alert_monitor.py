@@ -31,16 +31,16 @@ def create_session() -> requests.Session:
     return session
 
 
-async def filter_alerts_to_publish(alert: dict) -> list[str]:
+def filter_alerts_to_publish(alert: dict) -> list[str]:
     """Check if the alert should be published."""
-    if await alerts_handled.get(alert["id"]):
+    if alerts_handled.get(alert["id"]):
         return []
-    if not await alerts_handled.get(alert["title"]):
+    if not alerts_handled.get(alert["title"]):
         return alert["data"]
     return [
         location
         for location in alert["data"]
-        if location not in await alerts_handled.get(alert["title"])
+        if location not in alerts_handled.get(alert["title"])
     ]
 
 
@@ -83,7 +83,7 @@ async def check_alerts(context: CallbackContext) -> None:
 
 
 async def publish_alert_to_users(alert: dict, bot: Bot) -> None:
-    alert_locations = await filter_alerts_to_publish(alert)
+    alert_locations = filter_alerts_to_publish(alert)
 
     if len(alert_locations) == 0:
         logger.info(
@@ -91,8 +91,8 @@ async def publish_alert_to_users(alert: dict, bot: Bot) -> None:
         )
         return
 
-    await alerts_handled.put(alert["id"], alert)
-    await alerts_handled.put(alert["title"], alert_locations)
+    alerts_handled.put(alert["id"], alert)
+    alerts_handled.put(alert["title"], alert_locations)
 
     # Get all subscriptions
     subscriptions = get_all_subscriptions()
