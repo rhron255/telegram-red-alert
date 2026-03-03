@@ -12,6 +12,7 @@ services:
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
       - SUPERUSER_ID=${SUPERUSER_ID}
       - ALERT_CHECK_INTERVAL=${ALERT_CHECK_INTERVAL}
+      - CACHE_TIMEOUT=${CACHE_TIMEOUT}
       - SQLITE_DB_PATH=/app/data/db
     volumes:
       - bot_data:/app/data

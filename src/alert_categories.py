@@ -5,6 +5,8 @@ class AlertCategory(Enum):
     IMPENDING = 14
     OVER = 13
     NOW = 1
+    HOSTILE_AIRCRAFT = 2
+    # INCOMING_SOON = 10
 
     def __str__(self):
         return self.name

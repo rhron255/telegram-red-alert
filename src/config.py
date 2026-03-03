@@ -26,4 +26,4 @@ DEV_MODE = False  # Need to make this a proper env variable
 
 DEBUG_FOLDER = os.getenv("DEBUG_FOLDER")
 
-CACHE_TIMEOUT = int(os.getenv("CACHE_TIMEOUT", 120))
+CACHE_TIMEOUT = int(os.getenv("CACHE_TIMEOUT", 180))  # Default to 3 minutes if not set
