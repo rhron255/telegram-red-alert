@@ -1,20 +1,21 @@
-import asyncio
-from datetime import datetime
 import json
 import logging
-import time
-from typing import Dict, Set
+from collections import defaultdict
+from datetime import datetime
+
 import requests
-from config import DEBUG_FOLDER
 from telegram import Bot
 from telegram.ext import CallbackContext
-from database import get_all_subscriptions
+
 from alert_response import EMPTY_RESPONSE_TEXT
+from config import DEBUG_FOLDER
+from database import get_all_subscriptions
 from temporal_cache import TemporalCache
 
 logger = logging.getLogger(__name__)
 
-alerts_handled = TemporalCache()
+alerts_handled = defaultdict(lambda: TemporalCache[str]())
+handled_ids = TemporalCache[str]()
 
 
 def create_session() -> requests.Session:
@@ -33,14 +34,10 @@ def create_session() -> requests.Session:
 
 def filter_alerts_to_publish(alert: dict) -> list[str]:
     """Check if the alert should be published."""
-    if alerts_handled.get(alert["id"]):
-        return []
-    if not alerts_handled.get(alert["title"]):
-        return alert["data"]
-    return [
-        location
-        for location in alert["data"]
-        if location not in alerts_handled.get(alert["title"])
+    already_handled_alert = alert["id"] in handled_ids
+    current_alert_category_location_cache = alerts_handled.get(alert["title"])
+    return [] if already_handled_alert else [
+        location for location in alert["data"] if location not in current_alert_category_location_cache
     ]
 
 
@@ -65,9 +62,11 @@ async def check_alerts(context: CallbackContext) -> None:
             data = response.json()
         except Exception as e:
             if response.text.strip() == "":
-                logger.warning("Received non standard empty response from alerts endpoint.")
+                logger.warning(
+                    "Received non standard empty response from alerts endpoint."
+                )
                 return
-            
+
             decoded_data = response.text.encode("utf-8").decode("utf-8-sig")
 
             data = json.loads(decoded_data)
@@ -103,8 +102,8 @@ async def publish_alert_to_users(alert: dict, bot: Bot) -> None:
         )
         return
 
-    alerts_handled.put(alert["id"], alert)
-    alerts_handled.put(alert["title"], alert_locations)
+    handled_ids.put(alert["id"])
+    alerts_handled[alert["title"]].add_all(alert_locations)
 
     # Get all subscriptions
     subscriptions = get_all_subscriptions()
@@ -116,10 +115,12 @@ async def publish_alert_to_users(alert: dict, bot: Bot) -> None:
 
     # Notify subscribed users
     for user_id, locations in subscriptions.items():
-        user_locs = [loc for loc in alert_locations if any(map(lambda x: x in loc, locations))]
+        user_locs = [
+            loc for loc in alert_locations if any(map(lambda x: x in loc, locations))
+        ]
         if any(loc in alert_locations for loc in locations) or "all" in locations:
             message = (
-                f"🚨 {title} 🚨" + "\n" + desc + "\n\nמיקומים:\n" + "\n".join(user_locs)
+                    f"🚨 {title} 🚨" + "\n" + desc + "\n\nמיקומים:\n" + "\n".join(user_locs)
             )
             try:
                 await bot.send_message(chat_id=user_id, text=message)
