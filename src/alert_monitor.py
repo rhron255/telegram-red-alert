@@ -73,13 +73,25 @@ async def check_alerts(context: CallbackContext) -> None:
             data = json.loads(decoded_data)
 
         logger.info(f"Alert in progress: {data['title']}")
+        with open(
+                f"{DEBUG_FOLDER}/alert_log_{datetime.now().strftime('%d_%m_%y_%H:%M:%S')}.txt",
+                "a",
+        ) as f:
+            json.dump(data, f, ensure_ascii=False, indent=4)
 
         await publish_alert_to_users(data, context.bot)
 
     except Exception as e:
-        logger.exception(f"Error checking alerts: {type(e).__name__}: {e}\n{e.__traceback__}")
-        with open(f"{DEBUG_FOLDER}/error_log_{datetime.now().strftime('%d_%m_%y_%H:%M:%S')}.txt", "a") as f:
-            f.write(f"{type(e).__name__}: {e}\n{e.__traceback__}\n\ncontent: {response.text}\n\n")
+        logger.exception(
+            f"Error checking alerts: {type(e).__name__}: {e}\n{e.__traceback__}"
+        )
+        with open(
+                f"{DEBUG_FOLDER}/error_log_{datetime.now().strftime('%d_%m_%y_%H:%M:%S')}.txt",
+                "a",
+        ) as f:
+            f.write(
+                f"{type(e).__name__}: {e}\n{e.__traceback__}\n\ncontent: {response.text}\n\n"
+            )
 
 
 async def publish_alert_to_users(alert: dict, bot: Bot) -> None:

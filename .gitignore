@@ -194,3 +194,4 @@ cython_debug/
 .cursorindexingignore
 
 ./debug_data
+/debug_data/
