@@ -24,23 +24,19 @@ def _init_tables() -> None:
     """Initialize database tables if they don't exist."""
     try:
         cursor = get_db().cursor()
-        cursor.execute(
-            """
+        cursor.execute("""
             CREATE TABLE IF NOT EXISTS subscriptions (
                 user_id INTEGER,
                 location TEXT,
                 PRIMARY KEY (user_id, location)
             );
-        """
-        )
-        cursor.execute(
-            """
+        """)
+        cursor.execute("""
             CREATE TABLE IF NOT EXISTS admins (
                 user_id INTEGER,
                 PRIMARY KEY (user_id)
             )
-        """
-        )
+        """)
         get_db().commit()
     except Exception as e:
         logger.error(f"Error initializing database tables: {e}")

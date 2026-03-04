@@ -35,10 +35,16 @@ def create_session() -> requests.Session:
 def filter_alerts_to_publish(alert: dict) -> list[str]:
     """Check if the alert should be published."""
     already_handled_alert = alert["id"] in handled_ids
-    current_alert_category_location_cache = alerts_handled.get(alert["title"])
-    return [] if already_handled_alert else [
-        location for location in alert["data"] if location not in current_alert_category_location_cache
-    ]
+    current_alert_category_location_cache = alerts_handled[alert["title"]]
+    return (
+        []
+        if already_handled_alert
+        else [
+            location
+            for location in alert["data"]
+            if location not in current_alert_category_location_cache
+        ]
+    )
 
 
 async def check_alerts(context: CallbackContext) -> None:
@@ -73,8 +79,8 @@ async def check_alerts(context: CallbackContext) -> None:
 
         logger.info(f"Alert in progress: {data['title']}")
         with open(
-                f"{DEBUG_FOLDER}/alert_log_{datetime.now().strftime('%d_%m_%y_%H:%M:%S')}.txt",
-                "a",
+            f"{DEBUG_FOLDER}/alert_log_{datetime.now().strftime('%d_%m_%y_%H:%M:%S')}.txt",
+            "a",
         ) as f:
             json.dump(data, f, ensure_ascii=False, indent=4)
 
@@ -85,8 +91,8 @@ async def check_alerts(context: CallbackContext) -> None:
             f"Error checking alerts: {type(e).__name__}: {e}\n{e.__traceback__}"
         )
         with open(
-                f"{DEBUG_FOLDER}/error_log_{datetime.now().strftime('%d_%m_%y_%H:%M:%S')}.txt",
-                "a",
+            f"{DEBUG_FOLDER}/error_log_{datetime.now().strftime('%d_%m_%y_%H:%M:%S')}.txt",
+            "a",
         ) as f:
             f.write(
                 f"{type(e).__name__}: {e}\n{e.__traceback__}\n\ncontent: {response.text}\n\n"
@@ -102,7 +108,7 @@ async def publish_alert_to_users(alert: dict, bot: Bot) -> None:
         )
         return
 
-    handled_ids.put(alert["id"])
+    handled_ids.add(alert["id"])
     alerts_handled[alert["title"]].add_all(alert_locations)
 
     # Get all subscriptions
@@ -120,7 +126,7 @@ async def publish_alert_to_users(alert: dict, bot: Bot) -> None:
         ]
         if any(loc in alert_locations for loc in locations) or "all" in locations:
             message = (
-                    f"🚨 {title} 🚨" + "\n" + desc + "\n\nמיקומים:\n" + "\n".join(user_locs)
+                f"🚨 {title} 🚨" + "\n" + desc + "\n\nמיקומים:\n" + "\n".join(user_locs)
             )
             try:
                 await bot.send_message(chat_id=user_id, text=message)

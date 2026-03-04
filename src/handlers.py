@@ -104,7 +104,7 @@ async def unsubscribe(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
 
 
 async def list_subscriptions(
-        update: Update, context: ContextTypes.DEFAULT_TYPE
+    update: Update, context: ContextTypes.DEFAULT_TYPE
 ) -> None:
     """List all current subscriptions."""
     user_id = update.effective_user.id
@@ -130,7 +130,9 @@ async def get_active_alerts(update: Update, context: ContextTypes.DEFAULT_TYPE) 
 
     alert_texts = []
     for title, location_cache in active_alerts:
-        alert_texts.append(f"🚨 {title} 🚨\nמיקומים:\n" + "\n".join(location_cache.get_all()))
+        alert_texts.append(
+            f"🚨 {title} 🚨\nמיקומים:\n" + "\n".join(location_cache.get_all())
+        )
 
     await update.message.reply_text("\n\n".join(alert_texts))
 
@@ -171,7 +173,7 @@ def process_alert_conversation():
 
 @admin_command
 async def start_alert_conversation(
-        update: Update, context: ContextTypes.DEFAULT_TYPE
+    update: Update, context: ContextTypes.DEFAULT_TYPE
 ) -> int:
     await update.message.reply_text(
         "**IMPORTANT**\n\nThis will trigger alerts to all users. If you are not sure, please cancel."
@@ -181,7 +183,7 @@ async def start_alert_conversation(
 
 @admin_command
 async def process_alert_message(
-        update: Update, context: ContextTypes.DEFAULT_TYPE
+    update: Update, context: ContextTypes.DEFAULT_TYPE
 ) -> int:
     file_content: bytearray = await (
         await update.message.document.get_file()
@@ -202,7 +204,7 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 
 @admin_command
 async def send_message_to_all(
-        update: Update, context: ContextTypes.DEFAULT_TYPE
+    update: Update, context: ContextTypes.DEFAULT_TYPE
 ) -> None:
     """Send a message to all users"""
     if not context.args:
