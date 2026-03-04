@@ -71,9 +71,7 @@ async def check_alerts(context: CallbackContext) -> None:
                 logger.warning(
                     "Received non standard empty response from alerts endpoint."
                 )
-            if response.text[1] == '{':
-                decoded_data = response.text[1:].encode("utf-8").decode("utf-8-sig")
-            elif response.text[0] != '{':
+            if response.text[0] != '{':
                 json_start = response.text.index('{')
                 decoded_data = response.text[json_start:].encode("utf-8").decode("utf-8-sig")
             else:
@@ -89,6 +87,12 @@ async def check_alerts(context: CallbackContext) -> None:
 
         await publish_alert_to_users(data, context.bot)
 
+            logger.info(f"Alert in progress: {data['title']}")
+            with open(
+                    f"{DEBUG_FOLDER}/alert_log_{data['id']}.json",
+                    "a",
+            ) as f:
+                json.dump(data, f, ensure_ascii=False, indent=4)
     except Exception as e:
         logger.exception(
             f"Error checking alerts: {type(e).__name__}: {e}\n{e.__traceback__}"
