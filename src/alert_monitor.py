@@ -71,10 +71,13 @@ async def check_alerts(context: CallbackContext) -> None:
                 logger.warning(
                     "Received non standard empty response from alerts endpoint."
                 )
-                return
-
-            decoded_data = response.text.encode("utf-8").decode("utf-8-sig")
-
+            if response.text[1] == '{':
+                decoded_data = response.text[1:].encode("utf-8").decode("utf-8-sig")
+            elif response.text[0] != '{':
+                json_start = response.text.index('{')
+                decoded_data = response.text[json_start:].encode("utf-8").decode("utf-8-sig")
+            else:
+                decoded_data = response.text.encode("utf-8").decode("utf-8-sig")
             data = json.loads(decoded_data)
 
         logger.info(f"Alert in progress: {data['title']}")
