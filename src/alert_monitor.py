@@ -1,5 +1,6 @@
 import json
 import logging
+import traceback
 from collections import defaultdict
 from datetime import datetime
 
@@ -7,7 +8,7 @@ import requests
 from telegram import Bot
 from telegram.ext import CallbackContext
 
-from alert_response import EMPTY_RESPONSE_TEXT
+from alert_response import EMPTY_RESPONSE_TEXT, AlertData
 from config import DEBUG_FOLDER
 from database import get_all_subscriptions
 from temporal_cache import TemporalCache
@@ -32,6 +33,11 @@ def create_session() -> requests.Session:
     return session
 
 
+def add_alert_to_cache(alert_data: AlertData):
+    handled_ids.add(alert_data.id)
+    alerts_handled[alert_data.title].add_all(alert_data.locations)
+
+
 def filter_alerts_to_publish(alert: dict) -> list[str]:
     """Check if the alert should be published."""
     already_handled_alert = alert["id"] in handled_ids
@@ -47,8 +53,8 @@ def filter_alerts_to_publish(alert: dict) -> list[str]:
     )
 
 
-async def check_alerts(context: CallbackContext) -> None:
-    """Check for new alerts and notify subscribed users."""
+def get_active_alert() -> dict:
+    response = None
     try:
         session = create_session()
 
@@ -61,79 +67,81 @@ async def check_alerts(context: CallbackContext) -> None:
         )
         response.raise_for_status()
 
-        if response.text == EMPTY_RESPONSE_TEXT:
-            return
+        text = "{}"
+        if response.text == EMPTY_RESPONSE_TEXT or len(response.text.strip()) == 0:
+            return {}
+        if response.text.strip()[0] == "{":
+            text = response.text.strip()
+        else:
+            json_start = response.text.index("{")
+            text = response.text[json_start:].encode("utf-8").decode("utf-8-sig")
 
-        try:
-            data = response.json()
-        except Exception as e:
-            if response.text.strip() == "":
-                logger.warning(
-                    "Received non standard empty response from alerts endpoint."
-                )
-            if response.text[0] != '{':
-                json_start = response.text.index('{')
-                decoded_data = response.text[json_start:].encode("utf-8").decode("utf-8-sig")
-            else:
-                decoded_data = response.text.encode("utf-8").decode("utf-8-sig")
-            data = json.loads(decoded_data)
-
+        data = json.loads(text)
         logger.info(f"Alert in progress: {data['title']}")
         with open(
-            f"{DEBUG_FOLDER}/alert_log_{datetime.now().strftime('%d_%m_%y_%H:%M:%S')}.txt",
+            f"{DEBUG_FOLDER}/alert_log_{data['id']}.json",
             "a",
         ) as f:
             json.dump(data, f, ensure_ascii=False, indent=4)
-
-        await publish_alert_to_users(data, context.bot)
-
-            logger.info(f"Alert in progress: {data['title']}")
-            with open(
-                    f"{DEBUG_FOLDER}/alert_log_{data['id']}.json",
-                    "a",
-            ) as f:
-                json.dump(data, f, ensure_ascii=False, indent=4)
+        return data
     except Exception as e:
         logger.exception(
             f"Error checking alerts: {type(e).__name__}: {e}\n{e.__traceback__}"
         )
         with open(
-            f"{DEBUG_FOLDER}/error_log_{datetime.now().strftime('%d_%m_%y_%H:%M:%S')}.txt",
+            f"{DEBUG_FOLDER}/error_log_{datetime.now().strftime('%d_%m_%y_%H_%M_%S')}.txt",
             "a",
         ) as f:
-            f.write(
-                f"{type(e).__name__}: {e}\n{e.__traceback__}\n\ncontent: {response.text}\n\n"
+            content = (
+                response.text if "response" in locals() else "<no response from server>"
             )
+            f.write(
+                f"{type(e).__name__}: {e}\n{traceback.format_tb(e.__traceback__)}\n\ncontent: {content}\n\n"
+            )
+        return {}
 
 
-async def publish_alert_to_users(alert: dict, bot: Bot) -> None:
-    alert_locations = filter_alerts_to_publish(alert)
-
-    if len(alert_locations) == 0:
-        logger.info(
-            f"No locations to publish for alert {alert['id']}, not yet expired..."
-        )
+async def check_and_publish_alerts(context: CallbackContext) -> None:
+    """Check for new alerts and notify subscribed users."""
+    raw_data = get_active_alert()
+    if raw_data == {}:
         return
 
-    handled_ids.add(alert["id"])
-    alerts_handled[alert["title"]].add_all(alert_locations)
+    filtered_locations = filter_alerts_to_publish(raw_data)
 
+    alert = AlertData(
+        raw_data["id"],
+        raw_data["cat"],
+        raw_data["title"],
+        filtered_locations,
+        raw_data["desc"],
+    )
+
+    add_alert_to_cache(alert)
+
+    if len(alert.locations) == 0:
+        logger.info(f"No locations to publish for alert {alert.id}, not yet expired...")
+        return
+
+    await publish_alert_to_users(alert, context.bot)
+
+
+async def publish_alert_to_users(alert: AlertData, bot: Bot) -> None:
     # Get all subscriptions
     subscriptions = get_all_subscriptions()
-
-    # Process alerts
-
-    title = alert["title"]
-    desc = alert["desc"]
 
     # Notify subscribed users
     for user_id, locations in subscriptions.items():
         user_locs = [
-            loc for loc in alert_locations if any(map(lambda x: x in loc, locations))
+            loc for loc in alert.locations if any(map(lambda x: x in loc, locations))
         ]
-        if any(loc in alert_locations for loc in locations) or "all" in locations:
+        if any(loc in alert.locations for loc in locations) or "all" in locations:
             message = (
-                f"🚨 {title} 🚨" + "\n" + desc + "\n\nמיקומים:\n" + "\n".join(user_locs)
+                f"🚨 {alert.title} 🚨"
+                + "\n"
+                + alert.description
+                + "\n\nמיקומים:\n"
+                + "\n".join(user_locs)
             )
             try:
                 await bot.send_message(chat_id=user_id, text=message)

@@ -4,7 +4,7 @@ import signal
 from dotenv import load_dotenv
 from telegram.ext import Application, CommandHandler
 
-from alert_monitor import check_alerts
+from alert_monitor import check_and_publish_alerts
 from config import ALERT_CHECK_INTERVAL, DEV_MODE, SUPERUSER_USER_ID, TELEGRAM_BOT_TOKEN
 from database import add_admin, close_db
 from handlers import (
@@ -64,7 +64,9 @@ def main():
     )
     if DEV_MODE:
         application.add_handler(process_alert_conversation())
-    application.job_queue.run_repeating(check_alerts, interval=ALERT_CHECK_INTERVAL)
+    application.job_queue.run_repeating(
+        check_and_publish_alerts, interval=ALERT_CHECK_INTERVAL
+    )
 
     application.run_polling()
 
