@@ -24,8 +24,6 @@ from handlers import (
 load_dotenv()
 
 # Configure logging
-
-
 logger = logging.getLogger(__name__)
 
 

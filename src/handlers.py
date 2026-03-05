@@ -1,6 +1,9 @@
+import datetime
 import functools
 import json
 import logging
+from collections import defaultdict
+from datetime import timedelta
 
 from telegram import Update
 from telegram.ext import (
@@ -11,7 +14,7 @@ from telegram.ext import (
     ContextTypes,
 )
 
-from alert_monitor import publish_alert_to_users
+from alert_monitor import get_alert_history
 from database import (
     add_subscription,
     get_admins,
@@ -53,9 +56,9 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
             "/list - List your current subscriptions\n"
             "/get_users - Get all users\n"
             "/get_subscriptions - Get all subscriptions\n"
-            "/help - Show this help message\n"
             "/test_alert - Test alert message, send a json file with the alert data\n"
             "/get_active_alerts - Prints out all active alerts\n"
+            "/help - Show this help message\n"
         )
     else:
         await update.message.reply_text(
@@ -63,6 +66,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
             "/subscribe <location> - Subscribe to alerts for a location\n"
             "/unsubscribe <location> - Unsubscribe from a location\n"
             "/list - List your current subscriptions\n"
+            "/get_active_alerts - Prints out all active alerts\n"
             "/help - Show this help message\n"
         )
 
@@ -118,21 +122,25 @@ async def list_subscriptions(
     await update.message.reply_text(f"Your current subscriptions:\n{locations_text}")
 
 
-@admin_command
 async def get_active_alerts(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    from alert_monitor import alerts_handled
-
     """Get all active alerts"""
-    active_alerts = alerts_handled.items()
+    alert_history = (await get_alert_history()).items()
+    active_alerts = []
+    for time, alerts in alert_history:
+        actual_time = datetime.datetime.strptime(time, "%Y-%m-%d %H:%M:%S")
+        if datetime.datetime.now() - actual_time < timedelta(minutes=10):
+            active_alerts.extend(alerts)
+
     if not active_alerts or len(active_alerts) == 0:
         await update.message.reply_text("There are no active alerts at the moment.")
         return
 
+    alerts = defaultdict(list)
+    for alert in active_alerts:
+        alerts[alert.title] += alert.locations
     alert_texts = []
-    for title, location_cache in active_alerts:
-        alert_texts.append(
-            f"🚨 {title} 🚨\nמיקומים:\n" + "\n".join(location_cache.get_all())
-        )
+    for title, locations in alerts.items():
+        alert_texts.append(f"🚨 {title} 🚨\nמיקומים:\n" + "\n".join(locations))
 
     await update.message.reply_text("\n\n".join(alert_texts))
 
