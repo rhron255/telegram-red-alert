@@ -4,7 +4,7 @@ import traceback
 from collections import defaultdict
 from datetime import datetime
 
-import requests
+import aiohttp
 from telegram import Bot
 from telegram.ext import CallbackContext
 
@@ -19,9 +19,9 @@ alerts_handled = defaultdict(lambda: TemporalCache[str]())
 handled_ids = TemporalCache[str]()
 
 
-def create_session() -> requests.Session:
+def create_session() -> aiohttp.ClientSession:
     """Create and configure a requests session."""
-    session = requests.Session()
+    session = aiohttp.ClientSession()
     session.headers.update(
         {
             "User-Agent": "Mozilla/5.0 (compatible; Python requests)",
@@ -53,59 +53,56 @@ def filter_alerts_to_publish(alert: dict) -> list[str]:
     )
 
 
-def get_active_alert() -> dict:
+async def get_active_alert(save_data=True) -> dict:
     response = None
     try:
-        session = create_session()
+        async with create_session() as session:
+            async with session.get(
+                "https://www.oref.org.il/WarningMessages/alert/alerts.json", timeout=10
+            ) as response:
+                response.raise_for_status()
 
-        # First visit homepage to get cookies
-        session.get("https://www.oref.org.il/", timeout=10)
+                text = (await response.text()).strip()
+                if text == EMPTY_RESPONSE_TEXT or len(text) == 0:
+                    return {}
+                if text[:].replace("\0", "") == "":
+                    return {}
+                if "{" not in text:
+                    return {}
+                if text[0] != "{":
+                    json_start = text.index("{")
+                    text = text[json_start:].encode("utf-8").decode("utf-8-sig")
 
-        # Get alerts
-        response = session.get(
-            "https://www.oref.org.il/WarningMessages/alert/alerts.json", timeout=10
-        )
-        response.raise_for_status()
-
-        text = response.text.strip()
-        if text == EMPTY_RESPONSE_TEXT or len(text) == 0:
-            return {}
-        if text[:].replace("\0", "") == "":
-            return {}
-        if "{" not in text:
-            return {}
-        if text[0] != "{":
-            json_start = text.index("{")
-            text = text[json_start:].encode("utf-8").decode("utf-8-sig")
-
-        data = json.loads(text)
-        logger.info(f"Alert in progress: {data['title']}")
-        with open(
-            f"{DEBUG_FOLDER}/alert_log_{data['id']}.json",
-            "w",
-        ) as f:
-            json.dump(data, f, ensure_ascii=False, indent=4)
-        return data
+                data = json.loads(text)
+                logger.info(f"Alert in progress: {data['title']}")
+                if save_data:
+                    with open(
+                        f"{DEBUG_FOLDER}/alert_log_{data['id']}.json",
+                        "w",
+                    ) as f:
+                        json.dump(data, f, ensure_ascii=False, indent=4)
+                return data
     except Exception as e:
         logger.exception(
             f"Error checking alerts: {type(e).__name__}: {e}\n{e.__traceback__}"
         )
-        with open(
-            f"{DEBUG_FOLDER}/error_log_{datetime.now().strftime('%d_%m_%y_%H_%M_%S')}.txt",
-            "a",
-        ) as f:
-            content = (
-                response.text if "response" in locals() else "<no response from server>"
-            )
-            f.write(
-                f"{type(e).__name__}: {e}\n{traceback.format_tb(e.__traceback__)}\n\ncontent: {content}\n\n"
-            )
+        if save_data:
+            with open(
+                f"{DEBUG_FOLDER}/error_log_{datetime.now().strftime('%d_%m_%y_%H_%M_%S')}.txt",
+                "a",
+            ) as f:
+                content = (
+                    response.text if "response" in locals() else "<no response from server>"
+                )
+                f.write(
+                    f"{type(e).__name__}: {e}\n{traceback.format_tb(e.__traceback__)}\n\ncontent: {content}\n\n"
+                )
         return {}
 
 
 async def check_and_publish_alerts(context: CallbackContext) -> None:
     """Check for new alerts and notify subscribed users."""
-    raw_data = get_active_alert()
+    raw_data = await get_active_alert()
     if raw_data == {}:
         return
 
