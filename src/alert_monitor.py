@@ -1,8 +1,11 @@
 import json
 import logging
 import traceback
+import uuid
 from collections import defaultdict
 from datetime import datetime
+from itertools import groupby
+from typing import Any
 
 import aiohttp
 from telegram import Bot
@@ -117,6 +120,37 @@ async def get_active_alert(save_data=True):
                     f"{type(e).__name__}: {e}\n{traceback.format_tb(e.__traceback__)}\n\ncontent: {'\n'.join(e.__notes__)}\n"
                 )
         return None
+
+
+async def get_alert_history() -> dict[str, list[AlertData]]:
+    """
+    Fetches alert history data and parses it into AlertData.
+    The lists will usually be 1 length lists, but I can't ensure that due to the unknown behavior of the API.
+    """
+    data: list[dict[str, str]] = await fetch_data_from_oref(
+        False, "History/AlertsHistory.json"
+    )
+
+    key_func = lambda x: x["alertDate"]
+    grouped_data = {
+        k: list(g) for k, g in groupby(sorted(data, key=key_func), key_func)
+    }
+    all_alerts: dict[str, list[AlertData]] = {}
+    for date, alerts in grouped_data.items():
+        parsed_alerts: dict[str, AlertData] = {}
+        for alert in alerts:
+            if alert["title"] not in parsed_alerts:
+                parsed_alerts[alert["title"]] = AlertData(
+                    uuid.uuid4().hex,
+                    alert["category"],
+                    alert["title"],
+                    [alert["data"]],
+                    alert["title"],
+                )
+            else:
+                parsed_alerts[alert["title"]].locations.append(alert["data"])
+        all_alerts[date] = list(parsed_alerts.values())
+    return all_alerts
 
 
 async def check_and_publish_alerts(context: CallbackContext) -> None:
