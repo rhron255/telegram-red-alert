@@ -53,57 +53,77 @@ def filter_alerts_to_publish(alert: dict) -> list[str]:
     )
 
 
-async def get_active_alert(save_data=True) -> dict:
-    response = None
+async def fetch_data_from_oref(
+        save_data: bool, file_to_fetch: str
+) -> dict[str, Any] | list[dict[str, Any]] | None:
     try:
         async with create_session() as session:
             async with session.get(
-                "https://www.oref.org.il/WarningMessages/alert/alerts.json", timeout=10
+                    f"https://www.oref.org.il/WarningMessages/alert/{file_to_fetch}",
+                    timeout=10,
             ) as response:
                 response.raise_for_status()
 
                 text = (await response.text()).strip()
                 if text == EMPTY_RESPONSE_TEXT or len(text) == 0:
-                    return {}
+                    return None
                 if text[:].replace("\0", "") == "":
-                    return {}
-                if "{" not in text:
-                    return {}
-                if text[0] != "{":
-                    json_start = text.index("{")
-                    text = text[json_start:].encode("utf-8").decode("utf-8-sig")
+                    return None
+                if "{" not in text and "[" not in text:
+                    return None
+                if text[0] != "{" or text[0] != "[":
+                    object_start = float("inf")
+                    list_start = float("inf")
+                    if "{" in text:
+                        object_start = text.index("{")
+                    if "[" in text:
+                        list_start = text.index("[")
+                    if list_start < object_start:
+                        text = text[list_start:].encode("utf-8").decode("utf-8-sig")
+                    else:
+                        text = text[object_start:].encode("utf-8").decode("utf-8-sig")
 
-                data = json.loads(text)
-                logger.info(f"Alert in progress: {data['title']}")
-                if save_data:
-                    with open(
-                        f"{DEBUG_FOLDER}/alert_log_{data['id']}.json",
-                        "w",
-                    ) as f:
-                        json.dump(data, f, ensure_ascii=False, indent=4)
-                return data
+                return json.loads(text)
+    except Exception as e:
+        e.add_note(
+            await response.text()
+            if "response" in locals()
+            else "<no response from server>"
+        )
+        raise
+
+
+async def get_active_alert(save_data=True):
+    try:
+        data = await fetch_data_from_oref(save_data, "alerts.json")
+        logger.info(f"Alert in progress: {data['title']}")
+        if data and save_data:
+            with open(
+                    f"{DEBUG_FOLDER}/alert_log_{data['id']}.json",
+                    "w",
+            ) as f:
+                json.dump(data, f, ensure_ascii=False, indent=4)
+        return data
     except Exception as e:
         logger.exception(
             f"Error checking alerts: {type(e).__name__}: {e}\n{e.__traceback__}"
         )
         if save_data:
             with open(
-                f"{DEBUG_FOLDER}/error_log_{datetime.now().strftime('%d_%m_%y_%H_%M_%S')}.txt",
-                "a",
+                    f"{DEBUG_FOLDER}/error_log_{datetime.now().strftime('%d_%m_%y_%H_%M_%S')}.txt",
+                    "a",
             ) as f:
-                content = (
-                    response.text if "response" in locals() else "<no response from server>"
-                )
                 f.write(
-                    f"{type(e).__name__}: {e}\n{traceback.format_tb(e.__traceback__)}\n\ncontent: {content}\n\n"
+                    f"{type(e).__name__}: {e}\n{traceback.format_tb(e.__traceback__)}\n\ncontent: {'\n'.join(e.__notes__)}\n"
                 )
         return {}
+        return None
 
 
 async def check_and_publish_alerts(context: CallbackContext) -> None:
     """Check for new alerts and notify subscribed users."""
     raw_data = await get_active_alert()
-    if raw_data == {}:
+    if raw_data is None or raw_data == {}:
         return
 
     filtered_locations = filter_alerts_to_publish(raw_data)
@@ -136,11 +156,11 @@ async def publish_alert_to_users(alert: AlertData, bot: Bot) -> None:
         ]
         if any(loc in alert.locations for loc in locations) or "all" in locations:
             message = (
-                f"🚨 {alert.title} 🚨"
-                + "\n"
-                + alert.description
-                + "\n\nמיקומים:\n"
-                + "\n".join(user_locs)
+                    f"🚨 {alert.title} 🚨"
+                    + "\n"
+                    + alert.description
+                    + "\n\nמיקומים:\n"
+                    + "\n".join(user_locs)
             )
             try:
                 await bot.send_message(chat_id=user_id, text=message)
