@@ -1,8 +1,9 @@
 import json
 
 with open(
-    "/Users/rhron255/Documents/Code/TelegramRedAlert/telegram-red-alert/alert_history_example.json",
+    "../example_responses/alert_history_example.json",
     "r",
+    encoding="utf-8",
 ) as f:
     data = json.load(f)
 
@@ -13,7 +14,7 @@ categories = {cat["title"]: cat["category"] for cat in data}
 print(categories)
 
 with open(
-    "/Users/rhron255/Documents/Code/TelegramRedAlert/telegram-red-alert/alert_categories.json",
+    "../alert_categories.json",
     "w",
     encoding="utf-8",
 ) as f:

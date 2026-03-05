@@ -1,8 +1,7 @@
 import json
-import requests
 import time
 
-from alert_response import AlertResponse
+import requests
 
 EMPTY_RESPONSE_TEXT = "\ufeff\r\n"
 
@@ -34,14 +33,12 @@ def check_alerts(session: requests.Session) -> None:
     # print(response.text)
     if response.text != EMPTY_RESPONSE_TEXT:
         try:
-            print(AlertResponse(response.json()))
+            print(response.json())
         except Exception as e:
             print(f"Error: {e}")
             print(response.text)
             print(
-                AlertResponse(
                     json.loads(response.text.encode("utf-8").decode("utf-8-sig"))
-                )
             )
 
 
