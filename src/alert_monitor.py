@@ -116,7 +116,6 @@ async def get_active_alert(save_data=True):
                 f.write(
                     f"{type(e).__name__}: {e}\n{traceback.format_tb(e.__traceback__)}\n\ncontent: {'\n'.join(e.__notes__)}\n"
                 )
-        return {}
         return None
 
 
