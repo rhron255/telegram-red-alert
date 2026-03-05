@@ -16,8 +16,8 @@ class AlertData:
         self.locations: list[str] = locations
         self.description: str = description
 
-    def __str__(self):
-        return f"AlertResponse(id={self.id}, category={self.category}, title={self.title[::-1]}, data={list(map(lambda x: x[::-1], self.locations))}, desc={self.description[::-1]})"
+    def __str__(self, direction=-1):
+        return f"AlertResponse(id={self.id}, category={self.category}, title={self.title[::direction]}, data={list(map(lambda x: x[::direction], self.locations))}, desc={self.description[::direction]})"
 
     def __repr__(self):
-        return self.__str__()
+        return self.__str__(direction=1)
