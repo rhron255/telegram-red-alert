@@ -3,7 +3,7 @@ from typing import Any
 
 import aiohttp
 
-from alert_response import EMPTY_RESPONSE_TEXT
+from alert_data import EMPTY_RESPONSE_TEXT
 
 
 def create_session() -> aiohttp.ClientSession:

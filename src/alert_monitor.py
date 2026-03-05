@@ -8,7 +8,7 @@ from itertools import groupby
 
 from telegram.ext import CallbackContext
 
-from alert_response import AlertData
+from alert_data import AlertData
 from config import DEBUG_FOLDER
 from database import get_all_subscriptions
 from fetch_from_oref import fetch_data_from_oref
