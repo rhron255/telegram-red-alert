@@ -1,16 +1,10 @@
 import datetime
 import functools
-import json
 import logging
 from collections import defaultdict
 from datetime import timedelta
-
 from telegram import Update
 from telegram.ext import (
-    ConversationHandler,
-    CommandHandler,
-    MessageHandler,
-    filters,
     ContextTypes,
 )
 
@@ -25,6 +19,7 @@ from database import (
 )
 
 logger = logging.getLogger(__name__)
+print = logger.info
 
 
 def admin_command(func):
@@ -138,11 +133,22 @@ async def get_active_alerts(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     alerts = defaultdict(list)
     for alert in active_alerts:
         alerts[alert.title] += alert.locations
-    alert_texts = []
     for title, locations in alerts.items():
-        alert_texts.append(f"🚨 {title} 🚨\nמיקומים:\n" + "\n".join(locations))
-
-    await update.message.reply_text("\n\n".join(alert_texts))
+        message_len = len(f"🚨 {title} 🚨\nמיקומים:\n" + "\n".join(locations))
+        TELEGRAM_MESSAGE_LIMIT = 1024
+        if message_len > TELEGRAM_MESSAGE_LIMIT:
+            for i in range(1 + message_len // TELEGRAM_MESSAGE_LIMIT):
+                print("HERE")
+                await update.message.reply_text(
+                    f"🚨 {title} 🚨\nמיקומים:\n"
+                    + "\n".join(
+                        locations[
+                            TELEGRAM_MESSAGE_LIMIT
+                            * i : TELEGRAM_MESSAGE_LIMIT
+                            * (i + 1)
+                        ]
+                    )
+                )
 
 
 @admin_command
@@ -162,52 +168,6 @@ async def get_subscriptions(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         for user_id, locations in get_all_subscriptions().items()
     )
     await update.message.reply_text(f"All subscriptions:\n{subscriptions}")
-
-
-PROCESSING_ALERT = 1
-
-
-def process_alert_conversation():
-    return ConversationHandler(
-        entry_points=[CommandHandler("test_alert", start_alert_conversation)],
-        states={
-            PROCESSING_ALERT: [
-                MessageHandler(filters.Document.ALL, process_alert_message)
-            ],
-        },
-        fallbacks=[CommandHandler("cancel", cancel)],
-    )
-
-
-@admin_command
-async def start_alert_conversation(
-    update: Update, context: ContextTypes.DEFAULT_TYPE
-) -> int:
-    await update.message.reply_text(
-        "**IMPORTANT**\n\nThis will trigger alerts to all users. If you are not sure, please cancel."
-    )
-    return PROCESSING_ALERT
-
-
-@admin_command
-async def process_alert_message(
-    update: Update, context: ContextTypes.DEFAULT_TYPE
-) -> int:
-    file_content: bytearray = await (
-        await update.message.document.get_file()
-    ).download_as_bytearray()
-    data = json.loads(file_content.decode("utf-8-sig"))
-    await update.message.reply_text("Alert message received and decoded successfully.")
-    await publish_alert_to_users(data, context.bot)
-    return ConversationHandler.END
-
-
-@admin_command
-async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    await update.message.reply_text(
-        "Alert conversation cancelled.\n\nNo alert was triggered."
-    )
-    return ConversationHandler.END
 
 
 @admin_command

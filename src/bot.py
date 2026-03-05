@@ -11,7 +11,6 @@ from handlers import (
     get_active_alerts,
     get_subscriptions,
     get_users,
-    process_alert_conversation,
     send_message_to_all,
     start,
     help_command,
@@ -60,8 +59,6 @@ def main():
     application.add_handler(
         CommandHandler("get_active_alerts", get_active_alerts, has_args=False)
     )
-    if DEV_MODE:
-        application.add_handler(process_alert_conversation())
     application.job_queue.run_repeating(
         check_and_publish_alerts, interval=ALERT_CHECK_INTERVAL
     )

@@ -1,7 +1,7 @@
+import logging
 import sqlite3
 import threading
 from typing import Set, Dict, Optional
-import logging
 
 from config import SQLITE_DB_PATH
 
