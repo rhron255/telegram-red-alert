@@ -5,7 +5,7 @@ from collections import defaultdict
 data = defaultdict(int)
 counter = 0
 interesting_files = []
-for file in os.listdir('../debug_data'):
+for file in os.listdir("../debug_data"):
     interesting = True
     if "error_log" in file:
         with open(f"../debug_data/{file}", "r", encoding="utf-8") as f:
@@ -14,7 +14,7 @@ for file in os.listdir('../debug_data'):
             if len(lines) == 0:
                 interesting = False
             for line in lines:
-                if line.strip() == '':
+                if line.strip() == "":
                     continue
                 if "traceback object" in line:
                     data["traceback"] += 1
@@ -26,4 +26,4 @@ for file in os.listdir('../debug_data'):
                 interesting_files.append(file)
 print(f"total files: {counter}")
 print(json.dumps(data, indent=4))
-print('\n'.join(interesting_files))
+print("\n".join(interesting_files))

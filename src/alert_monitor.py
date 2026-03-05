@@ -67,20 +67,22 @@ def get_active_alert() -> dict:
         )
         response.raise_for_status()
 
-        text = "{}"
-        if response.text == EMPTY_RESPONSE_TEXT or len(response.text.strip()) == 0:
+        text = response.text.strip()
+        if text == EMPTY_RESPONSE_TEXT or len(text) == 0:
             return {}
-        if response.text.strip()[0] == "{":
-            text = response.text.strip()
-        else:
-            json_start = response.text.index("{")
-            text = response.text[json_start:].encode("utf-8").decode("utf-8-sig")
+        if text[:].replace("\0", "") == "":
+            return {}
+        if "{" not in text:
+            return {}
+        if text[0] != "{":
+            json_start = text.index("{")
+            text = text[json_start:].encode("utf-8").decode("utf-8-sig")
 
         data = json.loads(text)
         logger.info(f"Alert in progress: {data['title']}")
         with open(
             f"{DEBUG_FOLDER}/alert_log_{data['id']}.json",
-            "a",
+            "w",
         ) as f:
             json.dump(data, f, ensure_ascii=False, indent=4)
         return data
