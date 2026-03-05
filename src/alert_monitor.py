@@ -17,7 +17,10 @@ from temporal_cache import TemporalCache
 logger = logging.getLogger(__name__)
 
 alerts_handled = defaultdict(lambda: TemporalCache[str]())
-handled_ids = TemporalCache[str]()
+handled_ids = set()
+"""
+Pikud ha'oref suck, so they don't necessarily clear the last alert? This happened once, but now it means this cache can't be temporary...
+"""
 DebugData = namedtuple("DebugData", ["file", "data"])
 
 
@@ -33,7 +36,9 @@ async def get_active_alert(save_data=True) -> AlertData | None:
         if not data or data["id"] in handled_ids:
             return None
 
-        logger.info(f"Alert in progress: {data['title']}")
+        logger.info(
+            f"Alert '{data['title']}' with ID: {data['id']} in progress, number of locations: {len(data['data'])}"
+        )
 
         current_alert_category_location_cache = alerts_handled[data["title"]]
         filtered_locations = [
@@ -81,7 +86,8 @@ async def get_alert_history() -> dict[str, list[AlertData]]:
     data: list[dict[str, str]] = await fetch_data_from_oref(
         False, "History/AlertsHistory.json"
     )
-
+    if not data:
+        return {}
     key_func = lambda x: x["alertDate"]
     grouped_data = {
         key: list(group) for key, group in groupby(sorted(data, key=key_func), key_func)
@@ -107,6 +113,9 @@ async def get_alert_history() -> dict[str, list[AlertData]]:
 
 async def check_and_publish_alerts(context: CallbackContext) -> None:
     """Check for new alerts and notify subscribed users."""
+    global handled_ids
+    if len(handled_ids) > 1024:
+        handled_ids = handled_ids[:1024]
     alert = await get_active_alert()
     if alert is None:
         return
